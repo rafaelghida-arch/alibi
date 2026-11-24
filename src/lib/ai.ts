@@ -162,7 +162,9 @@ async function callModel(messages: Msg[]): Promise<string> {
   const key = process.env.AI_API_KEY?.trim().replace(/^["']|["']$/g, '');
   if (!key) throw new Error('AI_API_KEY ausente');
   if (provider === 'anthropic' && !key.startsWith('sk-ant-'))
-    throw new Error(`AI_API_KEY não parece uma chave da Anthropic (começa com "${key.slice(0, 7)}…", deveria começar com "sk-ant-")`);
+    throw new Error(
+      `AI_API_KEY não é uma chave da Anthropic: ${key.startsWith('sk-proj') || key.startsWith('sk-') ? 'parece ser da OpenAI' : key.startsWith('AIza') ? 'parece ser do Google' : 'formato desconhecido'} (${key.length} caracteres).`,
+    );
   const system = 'Você é roteirista de mistérios dedutivos justos. Você devolve somente JSON válido.';
   if (provider === 'anthropic') {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
