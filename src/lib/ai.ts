@@ -178,18 +178,22 @@ async function callModel(messages: Msg[]): Promise<string> {
   }
   if (provider === 'openai') {
     const base = process.env.AI_BASE_URL || 'https://api.openai.com/v1';
-    const res = await fetch(`${base}/chat/completions`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: process.env.AI_MODEL || 'gpt-4.1',
-        response_format: { type: 'json_object' },
-        messages: [{ role: 'system', content: system }, ...messages],
-      }),
-    });
-    if (!res.ok) throw new Error(`IA respondeu ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content ?? '';
+    const models = Array.from(new Set([process.env.AI_MODEL || 'gpt-4.1', 'gpt-4.1', 'gpt-4o']));
+    let last = '';
+    for (const model of models) {
+      const res = await fetch(`${base}/chat/completions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+        body: JSON.stringify({ model, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, ...messages] }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content ?? '';
+      }
+      last = `IA respondeu ${res.status} (${model}): ${(await res.text()).slice(0, 300)}`;
+      if (res.status !== 404 && res.status !== 400) break; // só troca de modelo se o modelo não existir
+    }
+    throw new Error(last);
   }
   throw new Error(`AI_PROVIDER desconhecido: ${provider}`);
 }
