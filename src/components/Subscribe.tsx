@@ -45,7 +45,7 @@ function Welcome({ onClose }: { onClose: () => void }) {
         </h1>
         <p className="wc-sub">Seu distintivo está pronto. A partir de agora, o arquivo inteiro é seu.</p>
         <ul className="wc-perks">
-          <li style={{ animationDelay: '1.3s' }}><b>Casos novos</b> escritos na hora, com fotos geradas para cada investigação</li>
+          <li style={{ animationDelay: '1.3s' }}><b>Casos novos</b> escritos na hora, com documentos, gravações e depoimentos</li>
           <li style={{ animationDelay: '1.45s' }}><b>Quatro dificuldades</b>, cada uma com uma lógica de mistério diferente</li>
           <li style={{ animationDelay: '1.6s' }}><b>Seus casos</b> ficam salvos para jogar quando quiser</li>
         </ul>
@@ -231,7 +231,7 @@ export function Subscribe() {
               <div className="price">{acc ? brl(acc.priceCents) : '—'} <small>/ mês</small></div>
               <ul className="features">
                 <li>Até {acc?.limit ?? '—'} casos novos por mês de assinatura</li>
-                <li>Fotografias geradas para cada caso</li>
+                <li>Documentos, gravações e depoimentos em cada caso</li>
                 <li>Fácil, Médio, Difícil e Extreme</li>
                 <li>Cancele em dois cliques, aqui mesmo</li>
               </ul>

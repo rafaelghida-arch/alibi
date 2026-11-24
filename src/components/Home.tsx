@@ -245,7 +245,7 @@ export function Home() {
           <div className="band-in" style={{ textAlign: 'center' }}>
             <h2 className="h2">Um caso novo sempre que você quiser.</h2>
             <p className="lede" style={{ margin: '0 auto 24px' }}>
-              Assinantes geram casos originais, com ilustrações e lógicas diferentes{acc ? `, por ${brl(acc.priceCents)}/mês` : ''}.
+              Assinantes geram casos originais, com personagens e lógicas diferentes{acc ? `, por ${brl(acc.priceCents)}/mês` : ''}.
             </p>
             <div className="row" style={{ justifyContent: 'center' }}>
               <button className="btn primary big" onClick={() => openWith()}>Abrir um caso</button>
@@ -291,7 +291,7 @@ export function Home() {
           <div>
             <div className="folderload" aria-hidden><i /><i /><i /></div>
             <h2 style={{ fontFamily: 'var(--display)', margin: '0 0 6px' }}>Montando o dossiê…</h2>
-            <p className="muted" style={{ margin: 0 }}>Escrevendo a verdade do caso, conferindo cada pista e revelando as fotografias. Pode levar até três minutos.</p>
+            <p className="muted" style={{ margin: 0 }}>Escrevendo a verdade do caso, conferindo cada pista. Pode levar até dois minutos.</p>
           </div>
         </div>
       )}
