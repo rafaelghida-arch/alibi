@@ -159,8 +159,10 @@ type Msg = { role: 'user' | 'assistant'; content: string };
 
 async function callModel(messages: Msg[]): Promise<string> {
   const provider = process.env.AI_PROVIDER || 'anthropic';
-  const key = process.env.AI_API_KEY;
+  const key = process.env.AI_API_KEY?.trim().replace(/^["']|["']$/g, '');
   if (!key) throw new Error('AI_API_KEY ausente');
+  if (provider === 'anthropic' && !key.startsWith('sk-ant-'))
+    throw new Error(`AI_API_KEY não parece uma chave da Anthropic (começa com "${key.slice(0, 7)}…", deveria começar com "sk-ant-")`);
   const system = 'Você é roteirista de mistérios dedutivos justos. Você devolve somente JSON válido.';
   if (provider === 'anthropic') {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -212,7 +214,7 @@ async function renderImage(prompt: string): Promise<Buffer> {
   const base = process.env.IMAGE_BASE_URL || 'https://api.openai.com/v1';
   const res = await fetch(`${base}/images/generations`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.IMAGE_API_KEY}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.IMAGE_API_KEY?.trim()}` },
     body: JSON.stringify({
       model: process.env.IMAGE_MODEL || 'gpt-image-1',
       prompt: IMAGE_STYLE + prompt,
