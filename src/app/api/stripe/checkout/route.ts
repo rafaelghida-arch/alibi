@@ -17,7 +17,9 @@ export async function POST(req: Request) {
           currency: 'brl',
           unit_amount: PRICE_CENTS(),
           recurring: { interval: 'month' as const },
-          product_data: { name: 'ÁLIBI — Assinatura', description: `Até ${MONTHLY_LIMIT()} casos novos por mês` },
+          ...(process.env.STRIPE_PRODUCT_ID
+            ? { product: process.env.STRIPE_PRODUCT_ID }
+            : { product_data: { name: 'ÁLIBI — Assinatura', description: `Até ${MONTHLY_LIMIT()} casos novos por mês` } }),
         },
       };
   const session = await stripe().checkout.sessions.create({
