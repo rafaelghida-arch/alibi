@@ -28,7 +28,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ id, d });
   } catch (e) {
     console.error('[generate]', e);
-    return NextResponse.json({ error: 'Não conseguimos montar um caso consistente agora. Nada foi descontado do seu limite.' }, { status: 502 });
+    const detail = String((e as Error).message ?? e).replace(/sk-[\w-]+/g, '***').slice(0, 300);
+    return NextResponse.json({ error: 'Não conseguimos montar um caso consistente agora. Nada foi descontado do seu limite.', detail }, { status: 502 });
   } finally {
     inFlight.delete(key);
   }
