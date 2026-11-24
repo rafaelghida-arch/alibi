@@ -6,6 +6,7 @@ import { DIFFICULTIES, DIFFICULTY_BLURB, DIFFICULTY_LABEL, type Difficulty } fro
 import { authFetch, brl, INDEX_KEY, store, useReducedMotion, type SavedIndexItem } from '@/lib/client';
 import { Scene } from './scenes';
 import { BADGES, RANKS } from './fx';
+import { AccountLink } from './Subscribe';
 
 interface Account { canGenerate: boolean; subscribed: boolean; used: number; limit: number; priceCents: number; signedIn: boolean; dev: boolean }
 
@@ -151,7 +152,7 @@ export function Home() {
       <header className="topbar">
         <Link href="/" className="wordmark">ÁLIBI</Link>
         <span className="spacer" />
-        <Link href="/assinar" className="linkbtn">Assinar</Link>
+        <AccountLink />
       </header>
       <main>
         <section className="hero2">

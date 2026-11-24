@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     metadata: { user_id: user.id },
     locale: 'pt-BR',
     allow_promotion_codes: true,
-    success_url: `${base}/assinar?status=ok`,
+    success_url: `${base}/assinar?status=ok&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${base}/assinar?status=cancelado`,
   });
   return NextResponse.json({ url: session.url });

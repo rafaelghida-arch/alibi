@@ -105,22 +105,23 @@ export interface Account {
   used: number;
   limit: number;
   periodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
   canGenerate: boolean;
   dev: boolean;
 }
 
 export async function accountFor(user: { id: string } | null): Promise<Account> {
   const limit = MONTHLY_LIMIT();
-  if (devUnlocked()) return { signedIn: !!user, subscribed: true, status: 'dev', used: 0, limit, periodEnd: null, canGenerate: true, dev: true };
+  if (devUnlocked()) return { signedIn: !!user, subscribed: true, status: 'dev', used: 0, limit, periodEnd: null, cancelAtPeriodEnd: false, canGenerate: true, dev: true };
   const sb = supabaseAdmin();
-  if (!sb || !user) return { signedIn: !!user, subscribed: false, status: null, used: 0, limit, periodEnd: null, canGenerate: false, dev: false };
-  const { data: sub } = await sb.from('subscriptions').select('status, current_period_start, current_period_end').eq('user_id', user.id).maybeSingle();
+  if (!sb || !user) return { signedIn: !!user, subscribed: false, status: null, used: 0, limit, periodEnd: null, cancelAtPeriodEnd: false, canGenerate: false, dev: false };
+  const { data: sub } = await sb.from('subscriptions').select('status, current_period_start, current_period_end, cancel_at_period_end').eq('user_id', user.id).maybeSingle();
   const active = !!sub && ['active', 'trialing'].includes(sub.status);
   const since = sub?.current_period_start ?? new Date(Date.now() - 30 * 864e5).toISOString();
   const { count } = await sb.from('cases').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', since);
   const used = count ?? 0;
   return {
     signedIn: true, subscribed: active, status: sub?.status ?? null, used, limit,
-    periodEnd: sub?.current_period_end ?? null, canGenerate: active && used < limit, dev: false,
+    periodEnd: sub?.current_period_end ?? null, cancelAtPeriodEnd: !!sub?.cancel_at_period_end, canGenerate: active && used < limit, dev: false,
   };
 }
