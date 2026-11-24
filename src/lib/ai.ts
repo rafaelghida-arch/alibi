@@ -115,7 +115,7 @@ Clue = { id (kebab-case), kind: "photo"|"ticket"|"receipt"|"note"|"chat"|"map"|"
  paragraphs? (statement, note, document), lines? {label?,text}[] (receipt, ticket, log, agenda, calllog, document), back? (texto escrito no verso do papel),
  speakerId? (statement), messages? {from,time,text}[] (chat), scene + marks {id,x,y(0-100),label,detail}[] (photo: 3-4 detalhes ampliáveis),
  places {id,label,x,y,note?}[] + routes {from,to,label?}[] (map), transcript {speaker,text}[] (audio),
- imagePrompt? (OBRIGATÓRIO em toda photo, inclusive intro.photo: descrição visual da cena em uma frase, com os objetos dos marks nas posições aproximadas; sem texto legível, sem rostos reconhecíveis) }
+ }
 Inclua de 2 a 3 pistas kind "photo" além da foto da introdução.`;
 
 const SECTION: Record<Difficulty, string> = {
@@ -190,12 +190,66 @@ async function callModel(messages: Msg[]): Promise<string> {
         const data = await res.json();
         return data.choices?.[0]?.message?.content ?? '';
       }
-      last = `IA respondeu ${res.status} (${model}): ${(await res.text()).slice(0, 300)}`;
+      const body = await res.text();
+      if (res.status === 429 && body.includes('insufficient_quota')) throw new Error('QUOTA: a conta da OpenAI está sem créditos');
+      last = `IA respondeu ${res.status} (${model}): ${body.slice(0, 300)}`;
       if (res.status !== 404 && res.status !== 400) break; // só troca de modelo se o modelo não existir
     }
     throw new Error(last);
   }
   throw new Error(`AI_PROVIDER desconhecido: ${provider}`);
+}
+
+/** Fixes small, mechanical mistakes in AI output so a good story is not thrown away. */
+export function repairCase(cf: CaseFile, d: Difficulty): CaseFile {
+  const c: CaseFile = JSON.parse(JSON.stringify(cf));
+  const clamp = (n: number) => Math.max(2, Math.min(98, Number(n) || 50));
+  const charIds = new Set(c.characters.map((x) => x.id));
+  // fotos sem detalhes viram documentos descritivos
+  for (const k of c.clues) {
+    if (k.kind === 'photo' && !(k.marks?.length && k.scene)) {
+      k.kind = 'document';
+      k.paragraphs = [k.scene || k.title, ...(k.paragraphs ?? [])];
+      delete k.marks;
+    }
+    k.marks?.forEach((m) => { m.x = clamp(m.x); m.y = clamp(m.y); });
+    k.places?.forEach((p) => { p.x = clamp(p.x); p.y = clamp(p.y); });
+    if (k.routes && k.places) { const ids = new Set(k.places.map((p) => p.id)); k.routes = k.routes.filter((r) => ids.has(r.from) && ids.has(r.to)); }
+    if (k.speakerId && !charIds.has(k.speakerId)) delete k.speakerId;
+  }
+  c.intro.photo.marks ??= [];
+  c.intro.photo.scene ||= c.intro.location;
+  const clueIds = new Set(c.clues.map((k) => k.id));
+  const sec = c.secret;
+  c.suspectIds = c.suspectIds.filter((x) => charIds.has(x));
+  if (charIds.has(sec.truth.culpritId) && !c.suspectIds.includes(sec.truth.culpritId)) c.suspectIds.push(sec.truth.culpritId);
+  sec.answers.culpado = sec.truth.culpritId;
+  const culpado = c.accusation.fields.find((f) => f.id === 'culpado');
+  const suspectOpts = c.suspectIds.map((x) => ({ id: x, text: c.characters.find((y) => y.id === x)!.name }));
+  if (culpado) culpado.options = suspectOpts;
+  else c.accusation.fields.unshift({ id: 'culpado', question: 'Quem é o responsável?', options: suspectOpts });
+  sec.truth.timeline.forEach((t) => (t.clueIds = t.clueIds.filter((x) => clueIds.has(x))));
+  sec.keyDeductions.forEach((k) => (k.evidenceSets = k.evidenceSets.map((set) => set.filter((x) => clueIds.has(x))).filter((set) => set.length)));
+  if (!sec.keyDeductions.some((k) => k.decisive) && sec.keyDeductions[0]) sec.keyDeductions[0].decisive = true;
+  if (d === 'facil' && c.facil && c.facil.stages.length > 3) {
+    const extra = c.facil.stages.slice(3);
+    c.facil.stages = c.facil.stages.slice(0, 3);
+    c.facil.conclusionClueIds = Array.from(new Set([...c.facil.conclusionClueIds, ...extra.flatMap((x) => x.clueIds)]));
+  }
+  if (d === 'medio' && c.medio && sec.medio) sec.medio.required = Math.max(1, Math.min(c.medio.deductions.length, sec.medio.required || 3));
+  if (d === 'dificil' && c.dificil && sec.dificil) {
+    const evIds = new Set(c.dificil.events.map((e) => e.id));
+    sec.dificil.eventOrder = sec.dificil.eventOrder.filter((x) => evIds.has(x));
+    c.dificil.events.forEach((e) => { if (!sec.dificil!.eventOrder.includes(e.id)) sec.dificil!.eventOrder.push(e.id); });
+    const timed = c.dificil.events.filter((e) => e.time);
+    if (timed.length > 3) {
+      const keep = new Set([sec.dificil.eventOrder[0], sec.dificil.eventOrder[sec.dificil.eventOrder.length - 1]]);
+      c.dificil.events.forEach((e) => { if (!keep.has(e.id)) delete e.time; });
+    }
+    c.dificil.lockedClueIds = c.dificil.lockedClueIds.filter((x) => clueIds.has(x));
+  }
+  for (const k of ['facil', 'medio', 'dificil', 'extreme'] as const) if (k !== d) delete c[k];
+  return c;
 }
 
 /** Offline generator used for tests and AI_PROVIDER=mock: a relabelled copy of the demo. */
@@ -279,7 +333,9 @@ export async function generateCase(d: Difficulty, id: string, recent: { logicTyp
   const messages: Msg[] = [{ role: 'user', content: buildPrompt(d, logic, setting, recent.map((r) => r.logicType)) }];
   const retries = Math.max(0, Math.min(3, Number(process.env.AI_MAX_RETRIES ?? 1)));
   let lastErrors: string[] = [];
+  const started = Date.now();
   for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0 && Date.now() - started > 140_000) break; // não estourar o limite de tempo do servidor
     const text = await callModel(messages);
     let errors: string[];
     try {
@@ -287,7 +343,7 @@ export async function generateCase(d: Difficulty, id: string, recent: { logicTyp
       if (!parsed.success) {
         errors = parsed.error.issues.slice(0, 15).map((i) => `${i.path.join('.')}: ${i.message}`);
       } else {
-        const cf = { ...(parsed.data as unknown as CaseFile), id, isDemo: false, logicType: logic, setting };
+        const cf = repairCase({ ...(parsed.data as unknown as CaseFile), id, isDemo: false, logicType: logic, setting }, d);
         errors = validateCase(cf, d);
         if (!errors.length) return await illustrate(cf);
       }

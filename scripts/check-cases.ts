@@ -1,7 +1,7 @@
 import { DEMO_CASE } from '../src/lib/demo-case';
 import { validateCase, publicView, checkEasyStage, checkLink, confront, judgeAccusation, accessibleClueIds } from '../src/lib/case-logic';
 import { DIFFICULTIES } from '../src/lib/types';
-import { mockCase } from '../src/lib/ai';
+import { mockCase, repairCase } from '../src/lib/ai';
 
 let fail = 0;
 const ok = (cond: unknown, msg: string) => { if (!cond) { fail++; console.error('✗', msg); } else console.log('✓', msg); };
@@ -45,6 +45,16 @@ ok(!(confront(DEMO_CASE, 'marta', 'recibo-posto') as any).pertinent, 'Difícil: 
 for (const d of DIFFICULTIES) {
   const mc = mockCase(d, 'abc');
   ok(validateCase(mc, d).length === 0, `caso mock (${d}) válido`);
+}
+// Reparo automático de erros mecânicos da IA
+for (const d of DIFFICULTIES) {
+  const bad = mockCase(d, 'rep');
+  bad.secret.answers.culpado = 'ninguem';
+  bad.accusation.fields = bad.accusation.fields.filter((f) => f.id !== 'culpado');
+  bad.clues[0].marks![0].x = 140;
+  bad.secret.truth.timeline[0].clueIds.push('pista-inexistente');
+  if (bad.dificil) bad.dificil.events.forEach((e) => (e.time = '00:00'));
+  ok(validateCase(bad, d).length > 0 && validateCase(repairCase(bad, d), d).length === 0, `reparo automático corrige caso com defeitos (${d})`);
 }
 if (fail) { console.error(`\n${fail} falha(s)`); process.exit(1); }
 console.log('\nTudo certo.');

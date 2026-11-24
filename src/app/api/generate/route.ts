@@ -29,7 +29,11 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error('[generate]', e);
     const detail = String((e as Error).message ?? e).replace(/sk-[\w-]+/g, '***').slice(0, 300);
-    return NextResponse.json({ error: 'Não conseguimos montar um caso consistente agora. Nada foi descontado do seu limite.', detail }, { status: 502 });
+    const quota = detail.startsWith('QUOTA');
+    const msg = quota
+      ? 'O gerador de casos está temporariamente indisponível. Tente de novo mais tarde — nada foi descontado do seu limite.'
+      : 'Não conseguimos montar um caso consistente agora. Nada foi descontado do seu limite.';
+    return NextResponse.json({ error: msg, detail }, { status: quota ? 503 : 502 });
   } finally {
     inFlight.delete(key);
   }
