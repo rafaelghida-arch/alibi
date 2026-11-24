@@ -15,7 +15,7 @@ page.on('pageerror', (e) => errors.push(e.message));
 
 // ---------------- FÁCIL ----------------
 await page.goto(BASE);
-await page.getByRole('button', { name: 'Abrir um caso' }).click();
+await page.getByRole('button', { name: 'Abrir um caso' }).first().click();
 await page.getByRole('radio', { name: /Fácil/ }).click();
 await page.getByRole('button', { name: 'Jogar o caso de demonstração' }).click();
 await page.getByText('CASO Nº 0417').first().waitFor();
@@ -52,6 +52,25 @@ await page.locator('[data-clue="foto-cabine"]').click();
 await page.locator('.viewer').waitFor();
 ok(Date.now() - t0 < 1000, `reabrir pista é rápido (${Date.now() - t0} ms)`);
 await page.keyboard.press('Escape');
+// marca-texto -> caderno
+await page.locator('[data-clue="dep-helena"]').click();
+await page.evaluate(() => {
+  const p = [...document.querySelectorAll('.pane p')].find((x) => x.textContent.includes('As câmeras ficam'));
+  const r = document.createRange(); r.selectNodeContents(p.firstChild ?? p);
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+});
+await page.getByRole('button', { name: 'Grifar em Amarelo' }).click();
+await page.keyboard.press('Escape');
+ok(await page.locator('.notebook').isVisible(), 'caderno fica aberto ao lado');
+await page.getByRole('tab', { name: /Grifos/ }).click();
+ok(await page.locator('.nb-quote', { hasText: 'As câmeras ficam' }).isVisible(), 'trecho grifado aparece no caderno');
+await page.locator('.nb-journal').count();
+await page.getByRole('tab', { name: 'Notas' }).click();
+await page.locator('.nb-journal').fill('Helena diz que só ela e o dono sabem a senha.');
+const xp1 = await page.locator('.xp-num').textContent();
+ok(parseInt(xp1) >= 30, `XP aumenta ao investigar (${xp1})`);
+await page.screenshot({ path: `${SHOTS}/05a-caderno.png` });
 
 // etapa 1: erro -> dica; acerto -> descoberta
 await page.getByRole('radio', { name: /Caio programou/ }).click();
@@ -60,7 +79,9 @@ await page.getByText('Ainda não.').waitFor();
 ok(true, 'resposta errada mostra dica');
 await page.getByRole('radio', { name: /A energia caiu/ }).click();
 await page.getByRole('button', { name: 'Responder' }).click();
-await page.getByText('Descoberta').waitFor();
+await page.locator('.stampfx').waitFor();
+ok(true, 'acerto dispara carimbo de descoberta');
+await page.getByText('Descoberta · +120 XP').waitFor();
 await page.screenshot({ path: `${SHOTS}/05-descoberta.png` });
 await page.getByRole('button', { name: 'Abrir etapa 2' }).click();
 await page.getByRole('heading', { name: 'O código colado no monitor' }).waitFor();
@@ -69,6 +90,7 @@ await page.getByRole('heading', { name: 'O código colado no monitor' }).waitFor
 await page.waitForTimeout(2200);
 await page.reload();
 await page.getByRole('heading', { name: 'O código colado no monitor' }).waitFor();
+ok((await page.locator('.nb-journal').inputValue()).startsWith('Helena diz'), 'recarga preserva o caderno');
 const t2 = await page.locator('[role=timer]').textContent();
 const sec = (t) => +t.split(':')[0] * 60 + +t.split(':')[1];
 ok(sec(t2) < sec(t1) && sec(t2) > sec(t1) - 120, `recarregar preserva a etapa e o prazo (${t1} → ${t2})`);
@@ -147,6 +169,9 @@ await page.getByRole('button', { name: 'Confrontar', exact: true }).click();
 await page.getByRole('tab', { name: /Novas declarações \(1\)/ }).waitFor();
 ok(true, 'Difícil: confronto pertinente cria aba com nova declaração');
 await page.getByRole('tab', { name: 'Cronologia' }).click();
+await page.getByRole('button', { name: /Conferir cronologia/ }).click();
+await page.locator('.tlscore').waitFor();
+ok(true, 'Difícil: conferir cronologia mostra quantos estão certos');
 await page.screenshot({ path: `${SHOTS}/08-dificil-cronologia.png` });
 
 // ---------------- EXTREME ----------------
@@ -177,7 +202,7 @@ await page.locator('.legend-row').first().locator('input').fill('horário duvido
 // ligar com linha rotulada (arrastando o ponto)
 const h = await card('log-alarme').locator('.handle').boundingBox();
 const tgt = await card('log-servidor').boundingBox();
-await page.mouse.move(h.x + 9, h.y + 9);
+await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
 await page.mouse.down();
 await page.mouse.move(tgt.x + 100, tgt.y + 50, { steps: 10 });
 ok(await page.locator('.links line.draft').count() === 1, 'Extreme: linha acompanha o cursor');

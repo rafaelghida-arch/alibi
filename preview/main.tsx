@@ -21,6 +21,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     if (b.type === 'stage') return json(checkEasyStage(DEMO_CASE, b.stageId, b.optionId));
     if (b.type === 'link') return json(checkLink(DEMO_CASE, b.a, b.b, b.claimId, b.available));
     if (b.type === 'confront') return json(confront(DEMO_CASE, b.characterId, b.clueId));
+    if (b.type === 'timeline') { const t = DEMO_CASE.secret.dificil!.eventOrder; return json({ correct: t.filter((id, i) => b.order?.[i] === id).length, total: t.length }); }
     if (b.type === 'accuse') return json(judgeAccusation(DEMO_CASE, b.d, { answers: b.answers, citedClueIds: b.citedClueIds, timelineOrder: b.timelineOrder }));
   }
   return json({ error: 'Indisponível na prévia. Casos novos funcionam no site publicado.' }, 503);

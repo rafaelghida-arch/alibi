@@ -22,6 +22,7 @@ const clue = z.object({
   places: z.array(z.object({ id: z.string(), label: z.string(), x: z.number(), y: z.number(), note: z.string().optional() })).optional(),
   routes: z.array(z.object({ from: z.string(), to: z.string(), label: z.string().optional() })).optional(),
   transcript: z.array(z.object({ speaker: z.string(), text: z.string() })).optional(),
+  imagePrompt: z.string().optional(),
 });
 const caseSchema = z.object({
   number: z.string(),
@@ -113,7 +114,9 @@ const SPEC = `Formato (TypeScript) do JSON que você deve devolver:
 Clue = { id (kebab-case), kind: "photo"|"ticket"|"receipt"|"note"|"chat"|"map"|"agenda"|"statement"|"calllog"|"audio"|"document"|"log", title, subtitle?,
  paragraphs? (statement, note, document), lines? {label?,text}[] (receipt, ticket, log, agenda, calllog, document), back? (texto escrito no verso do papel),
  speakerId? (statement), messages? {from,time,text}[] (chat), scene + marks {id,x,y(0-100),label,detail}[] (photo: 3-4 detalhes ampliáveis),
- places {id,label,x,y,note?}[] + routes {from,to,label?}[] (map), transcript {speaker,text}[] (audio) }`;
+ places {id,label,x,y,note?}[] + routes {from,to,label?}[] (map), transcript {speaker,text}[] (audio),
+ imagePrompt? (OBRIGATÓRIO em toda photo, inclusive intro.photo: descrição visual da cena em uma frase, com os objetos dos marks nas posições aproximadas; sem texto legível, sem rostos reconhecíveis) }
+Inclua de 2 a 3 pistas kind "photo" além da foto da introdução.`;
 
 const SECTION: Record<Difficulty, string> = {
   facil: `facil: { stages: [3 x {id:"s1"|"s2"|"s3", title, clueIds (3-4 pistas novas), question (dedutível das pistas desta etapa e anteriores), options: 4 x {id:"a".."d", text}}], conclusionClueIds: (2-3 pistas para a conclusão) }
@@ -199,6 +202,60 @@ export function mockCase(d: Difficulty, id: string): CaseFile {
   return c;
 }
 
+// ---------------------------------------------------------------------------
+// Ilustrações por IA (opcional): fotografias da introdução e das pistas.
+// ---------------------------------------------------------------------------
+const IMAGE_STYLE =
+  'Fotografia documental de investigação, estilo série true crime brasileira, 35mm, luz natural baixa, grão de filme, cores dessaturadas, composição jornalística. Sem texto legível, sem logotipos, sem rostos reconhecíveis. Cena: ';
+
+async function renderImage(prompt: string): Promise<Buffer> {
+  const base = process.env.IMAGE_BASE_URL || 'https://api.openai.com/v1';
+  const res = await fetch(`${base}/images/generations`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.IMAGE_API_KEY}` },
+    body: JSON.stringify({
+      model: process.env.IMAGE_MODEL || 'gpt-image-1',
+      prompt: IMAGE_STYLE + prompt,
+      size: '1536x1024',
+      quality: process.env.IMAGE_QUALITY || 'medium',
+      output_format: 'jpeg',
+      output_compression: 80,
+      n: 1,
+    }),
+  });
+  if (!res.ok) throw new Error(`imagem ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const data = await res.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error('imagem vazia');
+  return Buffer.from(b64, 'base64');
+}
+
+export const imagesConfigured = () => !!process.env.IMAGE_API_KEY;
+
+/** Generates up to IMAGE_MAX_PER_CASE pictures. Failures fall back to the drawn scene. */
+export async function illustrate(cf: CaseFile): Promise<CaseFile> {
+  const strip = (c: CaseFile) => {
+    delete c.intro.photo.imagePrompt;
+    c.clues.forEach((k) => delete k.imagePrompt);
+    return c;
+  };
+  if (!imagesConfigured()) return strip(cf);
+  const { saveImage } = await import('./server');
+  const max = Math.max(0, Math.min(8, Number(process.env.IMAGE_MAX_PER_CASE ?? 4)));
+  const targets = [cf.intro.photo, ...cf.clues.filter((k) => k.kind === 'photo')].filter((k) => k.imagePrompt).slice(0, max);
+  await Promise.all(
+    targets.map(async (k) => {
+      try {
+        const buf = await renderImage(k.imagePrompt!);
+        k.imageUrl = await saveImage(cf.id, k.id, buf);
+      } catch (e) {
+        console.warn('[illustrate]', k.id, (e as Error).message);
+      }
+    }),
+  );
+  return strip(cf);
+}
+
 export function aiConfigured() {
   return process.env.AI_PROVIDER === 'mock' || !!process.env.AI_API_KEY;
 }
@@ -224,7 +281,7 @@ export async function generateCase(d: Difficulty, id: string, recent: { logicTyp
       } else {
         const cf = { ...(parsed.data as unknown as CaseFile), id, isDemo: false, logicType: logic, setting };
         errors = validateCase(cf, d);
-        if (!errors.length) return cf;
+        if (!errors.length) return await illustrate(cf);
       }
     } catch {
       errors = ['A resposta não era um JSON válido.'];

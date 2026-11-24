@@ -191,7 +191,7 @@ export function validateCase(cf: CaseFile, d: Difficulty): string[] {
 export function checkEasyStage(cf: CaseFile, stageId: string, optionId: string) {
   const s = cf.secret.facil?.stages[stageId];
   if (!s) return { error: 'Etapa inválida' };
-  return s.answer === optionId ? { correct: true, establishes: s.establishes } : { correct: false, hint: s.hint };
+  return s.answer === optionId ? { correct: true, establishes: s.establishes, evidence: s.evidence } : { correct: false, hint: s.hint };
 }
 
 export function checkLink(cf: CaseFile, a: string, b: string, claimId: string, available: string[]) {

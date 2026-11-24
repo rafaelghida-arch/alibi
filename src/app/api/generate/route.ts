@@ -4,7 +4,7 @@ import { accountFor, recentStructures, saveCase, userFromRequest } from '@/lib/s
 import { aiConfigured, generateCase } from '@/lib/ai';
 import { DIFFICULTIES, type Difficulty } from '@/lib/types';
 
-export const maxDuration = 300;
+export const maxDuration = 300; // texto + imagens
 const inFlight = new Set<string>();
 
 export async function POST(req: Request) {

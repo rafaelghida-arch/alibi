@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { KIND_LABEL, type Clue } from '@/lib/types';
+import { Scene } from './scenes';
 
 function hash(s: string) {
   let h = 2166136261;
@@ -57,14 +58,22 @@ function PhotoScene({ clue }: { clue: Clue }) {
   );
 }
 
-function PhotoDoc({ clue }: { clue: Clue }) {
-  const [zoom, setZoom] = useState<string | null>(null);
+function PhotoDoc({ clue, onZoom }: { clue: Clue; onZoom?: (markId: string) => void }) {
+  const [zoom, setZoomState] = useState<string | null>(null);
+  const setZoom = (id: string | null) => { setZoomState(id); if (id) onZoom?.(id); };
   const mark = clue.marks?.find((m) => m.id === zoom);
   return (
     <div className="doc d-photo">
       <div className="ph">
         <div style={{ position: 'absolute', inset: 0, transition: 'transform 380ms cubic-bezier(.2,.8,.2,1)', transform: mark ? `scale(2.4)` : 'none', transformOrigin: mark ? `${mark.x}% ${mark.y}%` : '50% 50%' }}>
-          <PhotoScene clue={clue} />
+          {clue.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="scene" src={clue.imageUrl} alt={clue.scene ?? clue.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : clue.art ? (
+            <Scene id={clue.art} />
+          ) : (
+            <PhotoScene clue={clue} />
+          )}
           {!mark && clue.marks?.map((m, i) => (
             <button key={m.id} className="mk" style={{ left: `${m.x}%`, top: `${m.y}%` }} onClick={() => setZoom(m.id)} aria-label={`Ampliar: ${m.label}`}>
               {i + 1}
@@ -217,10 +226,10 @@ function Lines({ clue }: { clue: Clue }) {
   );
 }
 
-export function DocFront({ clue, speakerName }: { clue: Clue; speakerName?: string }) {
+export function DocFront({ clue, speakerName, onZoom }: { clue: Clue; speakerName?: string; onZoom?: (markId: string) => void }) {
   switch (clue.kind) {
     case 'photo':
-      return <PhotoDoc clue={clue} />;
+      return <PhotoDoc clue={clue} onZoom={onZoom} />;
     case 'audio':
       return <AudioDoc clue={clue} />;
     case 'map':
@@ -325,13 +334,13 @@ export function DocFront({ clue, speakerName }: { clue: Clue; speakerName?: stri
   }
 }
 
-export function ClueDoc({ clue, flipped, speakerName }: { clue: Clue; flipped: boolean; speakerName?: string }) {
-  if (!clue.back) return <div style={{ width: 'min(640px, 100%)', display: 'flex', justifyContent: 'center' }}><DocFront clue={clue} speakerName={speakerName} /></div>;
+export function ClueDoc({ clue, flipped, speakerName, onZoom }: { clue: Clue; flipped: boolean; speakerName?: string; onZoom?: (markId: string) => void }) {
+  if (!clue.back) return <div style={{ width: 'min(640px, 100%)', display: 'flex', justifyContent: 'center' }}><DocFront clue={clue} speakerName={speakerName} onZoom={onZoom} /></div>;
   return (
     <div className={`flip${flipped ? ' flipped' : ''}`}>
       <div className="flip-inner">
         <div className="flip-face" aria-hidden={flipped} style={{ display: 'flex', justifyContent: 'center' }}>
-          <DocFront clue={clue} speakerName={speakerName} />
+          <DocFront clue={clue} speakerName={speakerName} onZoom={onZoom} />
         </div>
         <div className="flip-face flip-back" aria-hidden={!flipped}>
           <div className="backpaper" aria-label="Verso">{clue.back}</div>

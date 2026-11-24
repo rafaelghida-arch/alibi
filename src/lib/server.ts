@@ -70,6 +70,29 @@ export async function recentStructures(userId: string | null): Promise<{ logicTy
   return (data ?? []).map((r) => ({ logicType: r.logic_type, setting: r.setting }));
 }
 
+// ---------------- Images ----------------
+const IMG_DIR = path.join(process.cwd(), '.data', 'images');
+export async function saveImage(caseId: string, key: string, data: Buffer): Promise<string> {
+  const name = `${caseId}-${key}`.replace(/[^a-zA-Z0-9-]/g, '-') + '.jpg';
+  const sb = supabaseAdmin();
+  if (sb) {
+    const { error } = await sb.storage.from('case-images').upload(name, data, { contentType: 'image/jpeg', upsert: true });
+    if (error) throw new Error(error.message);
+    return sb.storage.from('case-images').getPublicUrl(name).data.publicUrl;
+  }
+  await fs.mkdir(IMG_DIR, { recursive: true });
+  await fs.writeFile(path.join(IMG_DIR, name), data);
+  return `/api/images/${name}`;
+}
+export async function readLocalImage(name: string): Promise<Buffer | null> {
+  if (!/^[a-zA-Z0-9-]+\.jpg$/.test(name)) return null;
+  try {
+    return await fs.readFile(path.join(IMG_DIR, name));
+  } catch {
+    return null;
+  }
+}
+
 // ---------------- Entitlement ----------------
 export const PRICE_CENTS = () => Number(process.env.SUBSCRIPTION_PRICE_CENTS || 2990);
 export const MONTHLY_LIMIT = () => Number(process.env.GENERATION_LIMIT_PER_MONTH || 30);

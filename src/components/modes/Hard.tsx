@@ -17,7 +17,7 @@ function shuffle<T>(a: T[], seed: number) {
 
 type Tab = 'dep' | 'doc' | 'tl' | 'conf' | 'new';
 
-export function HardMode({ c, s, up, open, available, act, onAccuse }: ModeProps) {
+export function HardMode({ c, s, up, open, available, act, onAccuse, reward }: ModeProps) {
   const h = c.dificil!;
   const [tab, setTab] = useState<Tab>('dep');
   const [who, setWho] = useState<string>('');
@@ -25,6 +25,16 @@ export function HardMode({ c, s, up, open, available, act, onAccuse }: ModeProps
   const [busy, setBusy] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [freshTab, setFreshTab] = useState(false);
+  const [check, setCheck] = useState<{ correct: number; total: number } | null>(null);
+  async function checkTimeline() {
+    if (s.timelineChecks <= 0) return;
+    const r = await act({ type: 'timeline', order });
+    setCheck(r);
+    const prevBest = s.timelineBest;
+    up((x) => ({ ...x, timelineChecks: x.timelineChecks - 1, timelineBest: Math.max(x.timelineBest, r.correct) }));
+    if (r.correct === r.total) reward('tl:perfect', 150, 'Cronologia reconstruída', true);
+    else if (r.correct > prevBest) reward(`tl:${r.correct}`, (r.correct - prevBest) * 10, `${r.correct} de ${r.total} eventos no lugar certo`);
+  }
 
   useEffect(() => {
     if (!s.hard.order.length) up((x) => ({ ...x, hard: { ...x.hard, order: shuffle(h.events.map((e) => e.id), Number(c.number) || 7) } }));
@@ -58,7 +68,10 @@ export function HardMode({ c, s, up, open, available, act, onAccuse }: ModeProps
         },
         fresh: r.pertinent && r.unlocks && !already ? [...x.fresh, r.unlocks] : x.fresh,
       }));
-      if (r.pertinent && !already) setFreshTab(true);
+      if (r.pertinent && !already) {
+        setFreshTab(true);
+        reward(`conf:${r.unlocks}`, 100, `${name(who)} mudou a versão`, true);
+      } else if (!r.pertinent) reward(`try:${who}:${what}`, 2, 'Confronto registrado');
     } finally {
       setBusy(false);
     }
@@ -115,6 +128,15 @@ export function HardMode({ c, s, up, open, available, act, onAccuse }: ModeProps
               );
             })}
           </ol>
+          <div className="row" style={{ marginTop: 14 }}>
+            <button className="btn" disabled={s.timelineChecks <= 0} onClick={checkTimeline}>Conferir cronologia · {s.timelineChecks} restante{s.timelineChecks === 1 ? '' : 's'}</button>
+            {check && (
+              <span className="tlscore" key={check.correct + '-' + s.timelineChecks}>
+                <b>{check.correct}</b> de {check.total} na posição certa
+              </span>
+            )}
+          </div>
+          <p className="muted" style={{ fontSize: 13 }}>A conferência diz quantos eventos estão no lugar certo, mas não quais.</p>
         </div>
       )}
       {tab === 'conf' && (

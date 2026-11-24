@@ -17,6 +17,7 @@ export const DEMO_CASE: CaseFile = {
     photo: {
       id: 'intro-foto',
       kind: 'photo',
+      art: 'fachada',
       title: 'Fachada do Cine Aurora',
       subtitle: 'Domingo · 10h05',
       scene: 'Letreiro vertical aceso, cartazes do Festival de Inverno, porta de vidro aberta, calçada molhada.',
@@ -43,6 +44,7 @@ export const DEMO_CASE: CaseFile = {
     {
       id: 'foto-cabine',
       kind: 'photo',
+      art: 'cabine',
       title: 'Cabine de projeção',
       subtitle: 'Foto de Helena · dom 24/11 · 10h12',
       scene: 'Cabine estreita. Projetor digital ao centro, monitor do servidor aceso, janela para a rua lateral.',
@@ -86,6 +88,7 @@ export const DEMO_CASE: CaseFile = {
     {
       id: 'foto-quadro',
       kind: 'photo',
+      art: 'quadro',
       title: 'Quadro de luz',
       subtitle: 'Corredor dos fundos · dom 24/11 · 11h05',
       scene: 'Painel metálico com disjuntores, portinhola aberta, poeira acumulada.',

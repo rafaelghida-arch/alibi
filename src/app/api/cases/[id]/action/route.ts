@@ -17,6 +17,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json(checkLink(cf, String(body.a), String(body.b), String(body.claimId), Array.isArray(body.available) ? body.available : []));
     case 'confront':
       return NextResponse.json(confront(cf, String(body.characterId), String(body.clueId)));
+    case 'timeline': {
+      const truth = cf.secret.dificil?.eventOrder ?? [];
+      const order: string[] = Array.isArray(body.order) ? body.order : [];
+      return NextResponse.json({ correct: truth.filter((id, i) => order[i] === id).length, total: truth.length });
+    }
     case 'accuse':
       return NextResponse.json(judgeAccusation(cf, d, {
         answers: body.answers ?? {},

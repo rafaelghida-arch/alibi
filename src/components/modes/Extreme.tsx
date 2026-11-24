@@ -18,7 +18,7 @@ function hash(s: string) {
 /** Shuffled, legible starting layout: a jittered grid with no overlaps. */
 function scatter(ids: string[], seed: number) {
   const order = [...ids].sort((a, b) => (hash(a + seed) % 997) - (hash(b + seed) % 997));
-  const cols = Math.ceil(Math.sqrt(order.length * 1.6));
+  const cols = Math.ceil(Math.sqrt(order.length * 1.25));
   const pos: BoardState['pos'] = {};
   order.forEach((id, i) => {
     const h = hash(id);
@@ -35,7 +35,7 @@ type Drag =
 
 type Prompt = { kind: 'link'; a: string; b: string; x: number; y: number; edit?: string } | { kind: 'group'; ids: string[]; x: number; y: number };
 
-export function ExtremeMode({ c, s, up, open, available, onAccuse }: ModeProps) {
+export function ExtremeMode({ c, s, up, open, available, onAccuse, reward }: ModeProps) {
   const narrow = useIsNarrow();
   const b = s.board;
   const mode = b.mode ?? (narrow ? 'list' : 'board');
@@ -48,11 +48,11 @@ export function ExtremeMode({ c, s, up, open, available, onAccuse }: ModeProps) 
   return mode === 'list' ? (
     <ListView {...{ c, s, up, open, available, onAccuse, setBoard }} />
   ) : (
-    <Board {...{ c, s, open, available, onAccuse, setBoard }} />
+    <Board {...{ c, s, open, available, onAccuse, setBoard, reward }} />
   );
 }
 
-function Board({ c, s, open, available, onAccuse, setBoard }: Pick<ModeProps, 'c' | 's' | 'open' | 'available' | 'onAccuse'> & { setBoard: (fn: (b: BoardState) => BoardState) => void }) {
+function Board({ c, s, open, available, onAccuse, setBoard, reward }: Pick<ModeProps, 'c' | 's' | 'open' | 'available' | 'onAccuse' | 'reward'> & { setBoard: (fn: (b: BoardState) => BoardState) => void }) {
   const b = s.board;
   const wrap = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
@@ -208,8 +208,14 @@ function Board({ c, s, open, available, onAccuse, setBoard }: Pick<ModeProps, 'c
     const label = text.trim();
     if (prompt.kind === 'link') {
       if (prompt.edit) setBoard((bb) => ({ ...bb, links: bb.links.map((l) => (l.id === prompt.edit ? { ...l, label } : l)) }));
-      else setBoard((bb) => ({ ...bb, links: [...bb.links, { id: uid(), a: prompt.a, b: prompt.b, label }] }));
-    } else setBoard((bb) => ({ ...bb, groups: [...bb.groups, { id: uid(), label: label || 'Grupo', ids: prompt.ids }] }));
+      else {
+        setBoard((bb) => ({ ...bb, links: [...bb.links, { id: uid(), a: prompt.a, b: prompt.b, label }] }));
+        reward(`link:${Math.min(b.links.length + 1, 6)}`, 10, label ? `Ligação: “${label}”` : 'Pistas ligadas');
+      }
+    } else {
+      setBoard((bb) => ({ ...bb, groups: [...bb.groups, { id: uid(), label: label || 'Grupo', ids: prompt.ids }] }));
+      reward(`group:${Math.min(b.groups.length + 1, 4)}`, 10, `Grupo criado: ${label || 'Grupo'}`);
+    }
     setPrompt(null);
     setSel([]);
   }
@@ -217,6 +223,7 @@ function Board({ c, s, open, available, onAccuse, setBoard }: Pick<ModeProps, 'c
     const el = wrap.current!;
     const p = { x: (el.clientWidth / 2 - view.x) / view.s - 100, y: (el.clientHeight / 2 - view.y) / view.s - 60 };
     setBoard((bb) => ({ ...bb, notes: [...bb.notes, { id: uid(), ...p, text: '' }] }));
+    reward(`note:${Math.min(b.notes.length + 1, 4)}`, 5, 'Nota presa na mesa');
   }
 
   const groups = b.groups.map((g) => {
@@ -238,7 +245,7 @@ function Board({ c, s, open, available, onAccuse, setBoard }: Pick<ModeProps, 'c
       onPointerCancel={onUp}
       aria-label="Mesa de investigação"
     >
-      <div className="world" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})` }}>
+      <div className="world" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})`, ['--inv' as string]: String(Math.min(2.6, 1 / view.s)) }}>
         {groups.map((g) => g && (
           <div key={g.id} className="bgroup" style={{ left: g.x, top: g.y, width: g.w, height: g.h }}>
             <span className="gl" onPointerDown={(e) => e.stopPropagation()}>
@@ -334,7 +341,7 @@ function Board({ c, s, open, available, onAccuse, setBoard }: Pick<ModeProps, 'c
                 aria-label={`Cor ${col.label || 'sem legenda'}${sel.length ? ': aplicar às selecionadas' : ''}`}
                 onClick={() => (sel.length ? toggleColor(col.id, sel) : setActiveColor((a) => (a === col.id ? null : col.id)))}
               />
-              <input aria-label="Legenda da cor" placeholder="Legenda…" value={col.label} onChange={(e) => setBoard((bb) => ({ ...bb, colors: bb.colors.map((x) => (x.id === col.id ? { ...x, label: e.target.value } : x)) }))} />
+              <input aria-label="Legenda da cor" placeholder="Legenda…" value={col.label} onBlur={(e) => e.target.value.trim() && reward(`label:${col.id}`, 5, `Legenda: ${e.target.value.trim()}`)} onChange={(e) => setBoard((bb) => ({ ...bb, colors: bb.colors.map((x) => (x.id === col.id ? { ...x, label: e.target.value } : x)) }))} />
             </div>
           ))}
           <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>

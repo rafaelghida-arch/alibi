@@ -30,6 +30,17 @@ export interface GameState {
   draft: { answers: Record<string, string>; cited: string[]; narrative: string };
   verdict: Verdict | null;
   finishedAt: number | null;
+  // caderno e progressão
+  journal: string;
+  highlights: { id: string; clueId: string; text: string; color: string; note: string }[];
+  xp: number;
+  rewards: string[];
+  feed: { id: string; t: number; text: string; xp: number; big?: boolean }[];
+  badges: string[];
+  zoomed: string[];
+  flipped: string[];
+  timelineChecks: number;
+  timelineBest: number;
 }
 
 export const SWATCHES = ['#f2a93b', '#e5654f', '#5b9cf2', '#5bbf8a', '#b07cf0', '#9b998f'];
@@ -60,6 +71,16 @@ export const initialState = (): GameState => ({
   draft: { answers: {}, cited: [], narrative: '' },
   verdict: null,
   finishedAt: null,
+  journal: '',
+  highlights: [],
+  xp: 0,
+  rewards: [],
+  feed: [],
+  badges: [],
+  zoomed: [],
+  flipped: [],
+  timelineChecks: 3,
+  timelineBest: 0,
 });
 
 export type Update = (fn: (s: GameState) => GameState) => void;

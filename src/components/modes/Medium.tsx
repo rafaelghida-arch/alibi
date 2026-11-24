@@ -5,7 +5,7 @@ import type { ModeProps } from '../Game';
 
 export const initials = (n: string) => n.split(' ').map((p) => p[0]).slice(0, 2).join('');
 
-export function MediumMode({ c, s, up, open, available, act, onAccuse }: ModeProps) {
+export function MediumMode({ c, s, up, open, available, act, onAccuse, reward }: ModeProps) {
   const m = c.medio!;
   const [sel, setSel] = useState<string[]>([]);
   const [claim, setClaim] = useState<string | null>(null);
@@ -22,6 +22,7 @@ export function MediumMode({ c, s, up, open, available, act, onAccuse }: ModePro
   function hear(cid: string) {
     const ids = m.interviews.find((i) => i.characterId === cid)?.clueIds ?? [];
     up((x) => ({ ...x, medium: { ...x.medium, heard: [...x.medium.heard, cid] }, fresh: [...x.fresh, ...ids] }));
+    reward(`hear:${cid}`, 15, `Depoimento colhido: ${c.characters.find((x) => x.id === cid)?.name}`);
   }
   async function verify() {
     if (sel.length !== 2 || !claim) return;
@@ -37,6 +38,7 @@ export function MediumMode({ c, s, up, open, available, act, onAccuse }: ModePro
             medium: { ...x.medium, found: { ...x.medium.found, [r.deductionId]: r.establishes }, unlocked: Array.from(new Set([...x.medium.unlocked, ...(r.unlocks ?? [])])) },
             fresh: [...x.fresh, ...(r.unlocks ?? [])],
           }));
+          reward(`ded:${r.deductionId}`, 120, m.deductions.find((d) => d.id === r.deductionId)?.label ?? 'Dedução', true);
           setMsg({ ok: true, text: r.unlocks?.length ? `Dedução registrada. ${r.unlocks.length} nova(s) evidência(s) no dossiê.` : 'Dedução registrada.' });
         }
         setSel([]);

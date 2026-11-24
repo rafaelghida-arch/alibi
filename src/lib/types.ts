@@ -79,6 +79,12 @@ export interface Clue {
   places?: MapPlace[];
   routes?: { from: string; to: string; label?: string }[];
   transcript?: { speaker: string; text: string }[];
+  /** illustration drawn in code (demo) */
+  art?: string;
+  /** AI-generated picture (generated cases) */
+  imageUrl?: string;
+  /** prompt used to generate imageUrl (server only, removed from public view) */
+  imagePrompt?: string;
 }
 
 export interface Character {

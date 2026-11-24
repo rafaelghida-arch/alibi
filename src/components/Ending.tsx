@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { PublicCase, Verdict } from '@/lib/types';
 import type { GameState } from './state';
 import { brl, useReducedMotion } from '@/lib/client';
+import { BADGES, rankOf } from './fx';
 
 function duration(s: GameState) {
   if (!s.startedAt || !s.finishedAt) return null;
@@ -39,6 +40,14 @@ export function Ending({ c, s, verdict, open }: { c: PublicCase; s: GameState; v
         <div className="score">
           {verdict.score} / 100{dur ? ` · ${dur}` : ''}{verdict.timelineAccuracy != null ? ` · cronologia ${Math.round(verdict.timelineAccuracy * 100)}%` : ''}
           {s.limitMin != null && (overtime ? ' · fora do prazo' : ' · dentro do prazo')}
+        </div>
+        <div className="end-rank">
+          <div className="end-xp"><span className="mono">{s.xp}</span> XP · <b>{rankOf(s.xp).name}</b></div>
+          <div className="end-badges">
+            {BADGES.filter((b) => s.badges.includes(b.id)).map((b, i) => (
+              <span key={b.id} className="end-badge" style={{ animationDelay: `${600 + i * 120}ms` }} title={b.desc}><i>{b.icon}</i>{b.name}</span>
+            ))}
+          </div>
         </div>
       </section>
 

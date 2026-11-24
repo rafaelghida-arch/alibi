@@ -12,6 +12,9 @@ import { HardMode } from './modes/Hard';
 import { ExtremeMode } from './modes/Extreme';
 import { Accusation } from './Accusation';
 import { Ending } from './Ending';
+import { Celebrations, grant, MuteButton, XpPill } from './fx';
+import { Notebook, useNotebookOpen } from './Notebook';
+import { uid } from '@/lib/client';
 
 export function availableIds(c: PublicCase, s: GameState): string[] {
   if (c.facil) {
@@ -96,11 +99,40 @@ export function Game({ id, d }: { id: string; d: Difficulty }) {
     [up],
   );
   const onNote = useCallback((cid: string, text: string) => up((x) => ({ ...x, notes: { ...x.notes, [cid]: text } })), [up]);
+  const ctxRef = useMemo(() => ({ total: avail.length, events: c?.dificil?.events.length ?? 0 }), [avail.length, c]);
+  const reward = useCallback(
+    (key: string, xp: number, text: string, big = false) => up((x) => grant(x, key, xp, text, big, ctxRef)),
+    [up, ctxRef],
+  );
+  const titleOf = useCallback((id: string) => c?.clues.find((k) => k.id === id)?.title ?? id, [c]);
+  const fx = useMemo(() => ({
+    onSeen: (cid: string) => {
+      onSeen(cid);
+      reward(`open:${cid}`, 10, `Pista examinada: ${titleOf(cid)}`);
+    },
+    onFlip: (cid: string) => {
+      up((x) => (x.flipped.includes(cid) ? x : { ...x, flipped: [...x.flipped, cid] }));
+      reward(`flip:${cid}`, 15, `Verso encontrado: ${titleOf(cid)}`);
+    },
+    onZoom: (cid: string, m: string) => {
+      const k = `${cid}:${m}`;
+      up((x) => (x.zoomed.includes(k) ? x : { ...x, zoomed: [...x.zoomed, k] }));
+      reward(`zoom:${k}`, 5, 'Detalhe ampliado');
+    },
+    onCompare: (a: string, b: string) => reward(`cmp:${[a, b].sort().join('+')}`, 5, 'Documentos comparados'),
+    onHighlight: (cid: string, text: string, color: string) => {
+      up((x) => ({ ...x, highlights: [{ id: uid(), clueId: cid, text, color, note: '' }, ...x.highlights] }));
+      setTimeout(() => up((x) => grant(x, `hl:${Math.min(x.highlights.length, 6)}`, 8, 'Trecho grifado no caderno', false, ctxRef)), 0);
+    },
+  }), [onSeen, reward, titleOf, up, ctxRef]);
+  const nb = useNotebookOpen(d === 'extreme');
   const onExpire = useCallback((at: number) => up((x) => (x.expiredAt ? x : { ...x, expiredAt: at })), [up]);
 
   async function submitAccusation(answers: Record<string, string>, cited: string[], narrative: string) {
     const v: Verdict = await act({ type: 'accuse', answers, citedClueIds: cited, narrative, timelineOrder: d === 'dificil' ? s.hard.order : undefined });
     up((x) => ({ ...x, verdict: v, phase: 'ending', finishedAt: Date.now() }));
+    if (v.solved) reward('solved', 300, 'Caso resolvido', true);
+    else reward('closed', 50, 'Caso encerrado');
     window.scrollTo(0, 0);
   }
 
@@ -120,7 +152,17 @@ export function Game({ id, d }: { id: string; d: Difficulty }) {
     return <Deal count={avail.length} onDone={() => up((x) => ({ ...x, phase: 'play', startedAt: x.startedAt ?? Date.now(), fresh: [] }))} />;
 
   const viewingClue = viewing ? c.clues.find((k) => k.id === viewing) : null;
-  const modeProps = { c, s, up, open, available: availClues, act, onAccuse: () => { up((x) => ({ ...x, phase: 'accuse' })); window.scrollTo(0, 0); }, submitAccusation };
+  const examined = avail.filter((x) => s.opened.includes(x)).length / Math.max(1, avail.length);
+  const modePct = c.facil
+    ? Object.keys(s.easy.solved).length / c.facil.stages.length
+    : c.medio
+      ? Object.keys(s.medium.found).length / c.medio.deductions.length
+      : c.dificil
+        ? (s.hard.unlocked.length / Math.max(1, c.dificil.lockedClueIds.length) + s.timelineBest / c.dificil.events.length) / 2
+        : Math.min(1, (s.board.links.length + s.board.groups.length + s.highlights.length) / 8);
+  const pct = s.phase === 'ending' ? 1 : Math.min(1, examined * 0.45 + modePct * 0.55);
+  const showNb = s.phase === 'play' || s.phase === 'accuse';
+  const modeProps = { c, s, up, open, available: availClues, act, reward, onAccuse: () => { up((x) => ({ ...x, phase: 'accuse' })); window.scrollTo(0, 0); }, submitAccusation };
 
   return (
     <>
@@ -130,28 +172,35 @@ export function Game({ id, d }: { id: string; d: Difficulty }) {
         <span className="casechip">{DIFFICULTY_LABEL[d]}</span>
         {c.isDemo && <span className="demo-tag">Demonstração</span>}
         <span className="spacer" />
+        <XpPill xp={s.xp} pct={pct} />
+        <MuteButton />
         {s.phase !== 'ending' && <Timer s={s} onExpire={onExpire} />}
       </header>
+      <Celebrations feed={s.feed} />
       {s.expiredAt && !s.timeUpSeen && s.phase !== 'ending' && (
         <div className="timeup" role="alert">
           <span><b>Tempo esgotado.</b> O desafio foi registrado como encerrado. Suas anotações continuam aqui — siga investigando no seu ritmo.</span>
           <button className="btn small" onClick={() => up((x) => ({ ...x, timeUpSeen: true }))}>Continuar</button>
         </div>
       )}
+      <div className={showNb && nb.open && !nb.narrow ? 'with-nb' : ''}>
       {s.phase === 'play' && d === 'facil' && <EasyMode {...modeProps} />}
       {s.phase === 'play' && d === 'medio' && <MediumMode {...modeProps} />}
       {s.phase === 'play' && d === 'dificil' && <HardMode {...modeProps} />}
       {s.phase === 'play' && d === 'extreme' && <ExtremeMode {...modeProps} />}
       {s.phase === 'accuse' && <Accusation {...modeProps} onBack={() => up((x) => ({ ...x, phase: 'play' }))} />}
       {s.phase === 'ending' && s.verdict && <Ending c={c} s={s} verdict={s.verdict} open={open} />}
+      </div>
+      {showNb && <Notebook c={c} s={s} up={up} open={open} isOpen={nb.open} setOpen={nb.setOpen} narrow={nb.narrow} />}
       {viewingClue && (
         <Viewer
           clue={viewingClue}
           available={s.phase === 'ending' ? c.clues : availClues}
           characters={c.characters}
           notes={s.notes}
+          highlights={s.highlights}
           onNote={onNote}
-          onSeen={onSeen}
+          {...fx}
           onClose={() => setViewing(null)}
         />
       )}
@@ -167,5 +216,6 @@ export type ModeProps = {
   available: Clue[];
   act: (body: Record<string, unknown>) => Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   onAccuse: () => void;
+  reward: (key: string, xp: number, text: string, big?: boolean) => void;
   submitAccusation: (answers: Record<string, string>, cited: string[], narrative: string) => Promise<void>;
 };

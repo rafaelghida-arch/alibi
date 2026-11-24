@@ -12,7 +12,7 @@ function Option({ checked, onClick, children }: { checked: boolean; onClick: () 
   );
 }
 
-export function EasyMode({ c, s, up, open, available, act, submitAccusation }: ModeProps) {
+export function EasyMode({ c, s, up, open, available, act, submitAccusation, reward }: ModeProps) {
   const sec = c.facil!;
   const stageIdx = s.easy.stage;
   const stage = sec.stages[stageIdx];
@@ -20,6 +20,7 @@ export function EasyMode({ c, s, up, open, available, act, submitAccusation }: M
   const [hint, setHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<string[]>([]);
   const solvedHere = stage ? s.easy.solved[stage.id] : undefined;
 
   async function answer() {
@@ -30,6 +31,8 @@ export function EasyMode({ c, s, up, open, available, act, submitAccusation }: M
       const r = await act({ type: 'stage', stageId: stage.id, optionId: pick });
       if (r.correct) {
         setHint(null);
+        setEvidence(r.evidence ?? []);
+        reward(`stage:${stage.id}`, 120, stage.title, true);
         up((x) => ({ ...x, easy: { ...x.easy, solved: { ...x.easy.solved, [stage.id]: r.establishes } } }));
       } else setHint(r.hint);
     } catch (e) {
@@ -102,7 +105,17 @@ export function EasyMode({ c, s, up, open, available, act, submitAccusation }: M
                 </>
               ) : (
                 <div className="discovery" role="status">
-                  <div className="k">Descoberta</div>
+                  <div className="k">Descoberta · +120 XP</div>
+                  {evidence.length > 0 && (
+                    <div className="disc-ev">
+                      {evidence.map((id, i) => (
+                        <button key={id} className="disc-card" style={{ animationDelay: `${120 + i * 140}ms` }} onClick={() => open(id)}>
+                          <span>{c.clues.find((k) => k.id === id)?.title}</span>
+                        </button>
+                      ))}
+                      <span className="disc-link" aria-hidden />
+                    </div>
+                  )}
                   <p>{solvedHere}</p>
                   <button className="btn primary" onClick={next} autoFocus>
                     {stageIdx + 1 < sec.stages.length ? `Abrir etapa ${stageIdx + 2}` : 'Ir para a conclusão'}
