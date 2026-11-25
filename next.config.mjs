@@ -6,6 +6,7 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  output: 'standalone',
   webpack(config) {
     config.resolve.alias['@'] = path.join(dir, 'src');
     return config;
